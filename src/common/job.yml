@@ -1,0 +1,126 @@
+resources:
+  jobs:
+    fhir_lakehouse_pipeline:
+      name: fhir_lakehouse_pipeline
+      schedule:
+        quartz_cron_expression: 0 0 2 * * ?
+        timezone_id: Asia/Kolkata
+        pause_status: PAUSED
+      tasks:
+        - task_key: setup
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/setup.py
+            source: WORKSPACE
+        - task_key: raw_patient
+          depends_on:
+            - task_key: setup
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/01_raw_ingestion.py
+            base_parameters:
+              resource_type: Patient
+            source: WORKSPACE
+        - task_key: raw_encounter
+          depends_on:
+            - task_key: raw_patient
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/01_raw_ingestion.py
+            base_parameters:
+              resource_type: Encounter
+            source: WORKSPACE
+        - task_key: raw_observation
+          depends_on:
+            - task_key: raw_encounter
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/01_raw_ingestion.py
+            base_parameters:
+              resource_type: Observation
+            source: WORKSPACE
+        - task_key: raw_condition
+          depends_on:
+            - task_key: raw_observation
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/01_raw_ingestion.py
+            base_parameters:
+              resource_type: Condition
+            source: WORKSPACE
+        - task_key: bronze_condition
+          depends_on:
+            - task_key: raw_condition
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/02_bronze_layer.py
+            base_parameters:
+              resource_type: Condition
+            source: WORKSPACE
+        - task_key: bronze_encounter
+          depends_on:
+            - task_key: raw_condition
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/02_bronze_layer.py
+            base_parameters:
+              resource_type: Encounter
+            source: WORKSPACE
+        - task_key: bronze_observation
+          depends_on:
+            - task_key: raw_condition
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/02_bronze_layer.py
+            base_parameters:
+              resource_type: Observation
+            source: WORKSPACE
+        - task_key: bronze_patient
+          depends_on:
+            - task_key: raw_condition
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/02_bronze_layer.py
+            base_parameters:
+              resource_type: Patient
+            source: WORKSPACE
+        - task_key: silver_patient
+          depends_on:
+            - task_key: bronze_patient
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/03_silver_layer_scd2.py
+            base_parameters:
+              resource_type: Patient
+            source: WORKSPACE
+        - task_key: silver_encounter
+          depends_on:
+            - task_key: silver_patient
+            - task_key: bronze_encounter
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/03_silver_layer_scd2.py
+            base_parameters:
+              resource_type: Encounter
+            source: WORKSPACE
+        - task_key: silver_condition
+          depends_on:
+            - task_key: silver_encounter
+            - task_key: bronze_condition
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/03_silver_layer_scd2.py
+            base_parameters:
+              resource_type: Condition
+            source: WORKSPACE
+        - task_key: silver_observation
+          depends_on:
+            - task_key: silver_encounter
+            - task_key: bronze_observation
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/03_silver_layer_scd2.py
+            base_parameters:
+              resource_type: Observation
+            source: WORKSPACE
+        - task_key: gold_layer
+          depends_on:
+            - task_key: silver_observation
+            - task_key: silver_condition
+          notebook_task:
+            notebook_path: /Workspace/Users/mohitag9040@gmail.com/fhir-lakehouse/src/notebooks/04_gold_layer.py
+            source: WORKSPACE
+      queue:
+        enabled: true
+      environments:
+        - environment_key: serverless_env
+          spec:
+            client: "1"
+      performance_target: PERFORMANCE_OPTIMIZED
